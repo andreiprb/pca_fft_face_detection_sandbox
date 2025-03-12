@@ -13,6 +13,8 @@ for i, splts in enumerate(splts.flat):
     splts.set(xticks=[], yticks=[],
             xlabel=faces.target_names[faces.target[i]])
 
+plt.show()
+
 """----------------------------------------------------------------------------"""
 
 from sklearn.model_selection import train_test_split
