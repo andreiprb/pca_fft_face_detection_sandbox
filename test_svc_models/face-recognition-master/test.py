@@ -19,7 +19,8 @@ def preprocess(img):
 
     return encode, (t, r, b, l)
 
-labels = os.listdir('Dataset/')
+with open('models/labels.pickle', 'rb') as f:
+    labels = pickle.load(f)
 
 model = pickle.load(open('models/svm-96.model', 'rb'))
 X_test = np.load('train_data/X_test.npy')
