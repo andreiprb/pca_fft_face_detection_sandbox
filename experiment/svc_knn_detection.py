@@ -256,7 +256,7 @@ def sliding_window_detection(image: np.ndarray, model: Pipeline,
         min_scale (float, optional): Minimum scale to check. Defaults to 0.8.
         max_scale (float, optional): Maximum scale to check. Defaults to 3.0.
         confidence_threshold (float, optional): Minimum confidence for detection.
-            Defaults to 0.9 (increased from original value of 0.8).
+            Defaults to 0.9.
 
     Returns:
         List[Tuple[int, int, int, int, float]]: List of detections, each as
@@ -437,7 +437,7 @@ def detect_faces(image_path: str, model: Pipeline,
         scale_factor=1.2,
         min_scale=0.8,
         max_scale=2.0,
-        confidence_threshold=0.9  # Increased from 0.7 to reduce false positives
+        confidence_threshold=0.9
     )
 
     filtered_detections: List[Tuple[int, int, int, int, float]] = non_max_suppression(detections, overlap_threshold=0.3)
