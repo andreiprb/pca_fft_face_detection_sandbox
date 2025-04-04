@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline, Pipeline
 from skimage.feature import hog
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Dict, Any, Union
 import joblib, os
 from skimage import data
 from skimage.transform import resize
@@ -293,130 +293,271 @@ def create_training_data() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
     return X_train, X_test, y_train, y_test, (h, w)
 
 
-def optimized_sliding_window_detection(image, model, window_size, image_shape,
-                                       step_size=8, scale_factor=1.2,
-                                       min_neighbors=3, confidence_threshold=0.9):
+def create_selective_search_detection(image: np.ndarray, max_boxes: int = 1000) -> List[Tuple[int, int, int, int]]:
     """
-    More efficient implementation of sliding window detection using OpenCV's
-    built-in methods and custom classifier models.
+    Uses Selective Search algorithm to generate object proposal boxes for face detection.
+
+    Selective Search is a hierarchical grouping algorithm that generates
+    region proposals based on color, texture, size, and shape compatibility.
+
+    Args:
+        image (np.ndarray): Input image
+        max_boxes (int): Maximum number of boxes to generate
+
+    Returns:
+        List[Tuple[int, int, int, int]]: List of object proposal boxes as (x, y, w, h)
+    """
+    # If image is grayscale, convert to BGR for Selective Search
+    if len(image.shape) == 2:
+        image_color = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    else:
+        image_color = image.copy()
+
+    # Create Selective Search segmentation
+    ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
+
+    # If cv2.ximgproc is not available, use a fallback method
+    if not hasattr(cv2, 'ximgproc'):
+        return create_fallback_region_proposals(image, max_boxes)
+
+    # Initialize with the input image
+    ss.setBaseImage(image_color)
+
+    # Use fast strategy which is a good balance between quality and speed
+    ss.switchToSelectiveSearchFast()
+
+    # Get region proposals
+    rects = ss.process()
+
+    # Convert to our format (x, y, w, h)
+    proposals = []
+
+    # Filter by size and aspect ratio for face-like regions
+    min_width, min_height = 20, 20
+    for x, y, w, h in rects[:max_boxes]:
+        # Skip very small regions
+        if w < min_width or h < min_height:
+            continue
+
+        # Calculate aspect ratio (width/height)
+        aspect_ratio = w / float(h)
+
+        # Face aspect ratios typically fall between 0.5 and 1.5
+        if 0.5 <= aspect_ratio <= 1.5:
+            proposals.append((x, y, w, h))
+
+    # Limit number of proposals
+    return proposals[:max_boxes]
+
+
+def create_fallback_region_proposals(image: np.ndarray, max_boxes: int = 1000) -> List[Tuple[int, int, int, int]]:
+    """
+    Fallback function when Selective Search is not available.
+    Uses a combination of sliding windows and edge-based detection.
+
+    Args:
+        image (np.ndarray): Input image
+        max_boxes (int): Maximum number of boxes to generate
+
+    Returns:
+        List[Tuple[int, int, int, int]]: List of object proposal boxes as (x, y, w, h)
+    """
+    # Convert to grayscale if needed
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image.copy()
+
+    height, width = gray.shape
+    proposals = []
+
+    # Step 1: Use edge detection for region proposals
+    edges = cv2.Canny(gray, 50, 150)
+
+    # Apply dilation to connect nearby edges
+    kernel = np.ones((3, 3), np.uint8)
+    dilated_edges = cv2.dilate(edges, kernel, iterations=1)
+
+    # Find contours from the edges
+    contours, _ = cv2.findContours(dilated_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Convert contours to bounding boxes
+    min_width, min_height = 20, 20  # Minimum box dimensions
+
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        # Filter out very small boxes
+        if w > min_width and h > min_height:
+            # Calculate aspect ratio (width/height)
+            aspect_ratio = w / float(h)
+
+            # Face aspect ratios typically fall between 0.5 and 1.5
+            if 0.5 <= aspect_ratio <= 1.5:
+                proposals.append((x, y, w, h))
+
+    # Step 2: Add strategic sliding windows with different aspect ratios
+    # This helps ensure coverage in areas where edge detection might miss faces
+    window_sizes = [
+        (int(width * 0.1), int(height * 0.1)),  # Small
+        (int(width * 0.2), int(height * 0.2)),  # Medium
+        (int(width * 0.3), int(height * 0.3)),  # Large
+    ]
+
+    # Determine step size based on image size (smaller steps for smaller images)
+    step_ratio = 0.25  # 25% overlap between windows
+
+    for win_w, win_h in window_sizes:
+        step_x = max(1, int(win_w * step_ratio))
+        step_y = max(1, int(win_h * step_ratio))
+
+        for y in range(0, height - win_h + 1, step_y):
+            for x in range(0, width - win_w + 1, step_x):
+                proposals.append((x, y, win_w, win_h))
+
+    # Prioritize proposals by size (with preference for mid-sized regions)
+    def score_proposal(box):
+        x, y, w, h = box
+        area = w * h
+        ideal_area = width * height * 0.1  # Roughly 10% of image is ideal for a face
+        return -abs(area - ideal_area)  # Negative because we want to maximize
+
+    proposals.sort(key=score_proposal)
+
+    # Limit number of proposals
+    return proposals[:max_boxes]
+
+
+def create_image_pyramid(image: np.ndarray, min_size: int = 30,
+                         scale_factor: float = 1.2) -> List[Tuple[np.ndarray, float]]:
+    """
+    Creates an image pyramid by progressively scaling down the image.
+
+    This allows detection of faces at multiple scales without resizing the detection window.
+
+    Args:
+        image (np.ndarray): Input image
+        min_size (int): Minimum size of the smallest layer in the pyramid
+        scale_factor (float): How much to scale down each layer
+
+    Returns:
+        List[Tuple[np.ndarray, float]]: List of (scaled_image, scale_factor) pairs
+    """
+    # Initialize the pyramid
+    pyramid = []
+
+    # Add the original image
+    pyramid.append((image.copy(), 1.0))
+
+    # Calculate the current scale
+    current_scale = 1.0
+    current_image = image.copy()
+
+    # Keep scaling down until we reach the minimum size
+    while True:
+        # Calculate the new dimensions
+        current_scale *= scale_factor
+        new_width = int(image.shape[1] / current_scale)
+        new_height = int(image.shape[0] / current_scale)
+
+        # If either dimension becomes too small, break
+        if new_width < min_size or new_height < min_size:
+            break
+
+        # Resize the image
+        resized = cv2.resize(image, (new_width, new_height))
+
+        # Add to pyramid
+        pyramid.append((resized, current_scale))
+
+    return pyramid
+
+
+def detect_faces_with_selective_search(image: np.ndarray, model: Pipeline,
+                                       face_shape: Tuple[int, int],
+                                       min_confidence: float = 0.7) -> List[Tuple[int, int, int, int, float]]:
+    """
+    Detect faces in an image using Selective Search for region proposals and a classifier
+    to determine if each proposal contains a face.
 
     Args:
         image (np.ndarray): Input image
         model (Pipeline): Trained classifier model
-        window_size (Tuple[int, int]): Window size (height, width)
-        image_shape (Tuple[int, int]): Shape used for HOG feature extraction
-        step_size (int): Step size for window sliding
-        scale_factor (float): Factor to reduce image size at each scale
-        min_neighbors (int): Minimum neighbor detections to consider it valid
-        confidence_threshold (float): Confidence threshold for detection
+        face_shape (Tuple[int, int]): Shape of face images used in training (height, width)
+        min_confidence (float): Minimum confidence threshold
 
     Returns:
-        List[Tuple[int, int, int, int, float]]: List of detections (x, y, w, h, confidence)
+        List[Tuple[int, int, int, int, float]]: List of face detections (x, y, w, h, confidence)
     """
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
-        gray = image
+        gray = image.copy()
 
-    # Initialize detector with our model
-    class CustomDetector:
-        def __init__(self, model, window_size, image_shape, confidence_threshold):
-            self.model = model
-            self.window_size = window_size
-            self.image_shape = image_shape
-            self.confidence_threshold = confidence_threshold
+    h, w = face_shape
+    detections = []
 
-        def detectMultiScale(self, img, scaleFactor=1.2, minNeighbors=3, minSize=(30, 30), flags=0):
-            height, width = img.shape[:2]
+    # Create image pyramid
+    pyramid = create_image_pyramid(gray)
 
-            # Start with a detection list of windows at different scales
-            all_detections = []
-            current_scale = 1.0
-            min_size = min(self.window_size)
+    for layer, scale in pyramid:
+        # Get object proposals using Selective Search
+        proposals = create_selective_search_detection(layer)
 
-            # Use a more efficient scale pyramid
-            while min(height / current_scale, width / current_scale) > min_size:
-                # Resize the image instead of the window for efficiency
-                resized = cv2.resize(img, (0, 0), fx=1 / current_scale, fy=1 / current_scale)
+        if not proposals:
+            continue
 
-                # Process windows in batches for better performance
-                windows = []
-                coordinates = []
+        # Process each proposal
+        windows = []
+        coords = []
 
-                for y in range(0, resized.shape[0] - self.window_size[0], step_size):
-                    for x in range(0, resized.shape[1] - self.window_size[1], step_size):
-                        window = resized[y:y + self.window_size[0], x:x + self.window_size[1]]
-                        if window.shape[0] != self.window_size[0] or window.shape[1] != self.window_size[1]:
-                            continue
+        for (x, y, box_w, box_h) in proposals:
+            # Ensure the proposal is of a reasonable size to contain a face
+            if box_w < 10 or box_h < 10:
+                continue
 
-                        # Normalize if needed
-                        if window.max() > 1.0:
-                            window = window / 255.0
+            # Extract the region
+            roi = layer[y:y + box_h, x:x + box_w]
 
-                        windows.append(window)
-                        coordinates.append((x, y, current_scale))
+            # Skip if ROI is empty or has wrong dimensions
+            if roi.size == 0 or roi.shape[0] == 0 or roi.shape[1] == 0:
+                continue
 
-                if windows:
-                    # Extract HOG features in batch
-                    windows_hog = extract_hog_features(windows, image_shape=self.window_size)
+            # Resize to match the face shape expected by the model
+            roi_resized = cv2.resize(roi, (w, h))
 
-                    # Get confidence scores
-                    if hasattr(self.model, 'predict_proba'):
-                        confidences = self.model.predict_proba(windows_hog)[:, 1]
-                    else:
-                        predictions = self.model.predict(windows_hog)
-                        confidences = np.array([1.0 if p == 1 else 0.0 for p in predictions])
+            # Normalize if needed
+            if roi_resized.max() > 1.0:
+                roi_resized = roi_resized / 255.0
 
-                    # Add detections above threshold
-                    for (x, y, scale), conf in zip(coordinates, confidences):
-                        if conf > self.confidence_threshold:
-                            rect = (int(x * scale), int(y * scale),
-                                    int(self.window_size[1] * scale),
-                                    int(self.window_size[0] * scale))
-                            all_detections.append((*rect, conf))
+            windows.append(roi_resized)
+            coords.append((x, y, box_w, box_h, scale))
 
-                current_scale *= scaleFactor
+        if not windows:
+            continue
 
-            # Group overlapping detections (non-max suppression)
-            return self._group_rectangles(all_detections, minNeighbors)
+        # Extract HOG features for all windows
+        windows_hog = extract_hog_features(windows, image_shape=face_shape)
 
-        def _group_rectangles(self, detections, min_neighbors):
-            """Group overlapping rectangles and filter by min_neighbors"""
-            if not detections:
-                return []
+        # Get predictions from the model
+        if hasattr(model, 'predict_proba'):
+            confidences = model.predict_proba(windows_hog)[:, 1]
+        else:
+            predictions = model.predict(windows_hog)
+            confidences = np.array([1.0 if p == 1 else 0.0 for p in predictions])
 
-            # Extract rectangles and confidences
-            rectangles = [(x, y, x + w, y + h) for x, y, w, h, _ in detections]
-            confidences = [conf for _, _, _, _, conf in detections]
+        # Add detections that meet the confidence threshold
+        for (x, y, box_w, box_h, s), conf in zip(coords, confidences):
+            if conf >= min_confidence:
+                # Convert back to original image coordinates
+                orig_x = int(x * s)
+                orig_y = int(y * s)
+                orig_w = int(box_w * s)
+                orig_h = int(box_h * s)
 
-            # Use OpenCV's built-in groupRectangles for efficiency
-            rect_list = np.array([[x1, y1, x2, y2] for x1, y1, x2, y2 in rectangles])
-            weights = np.array(confidences)
+                detections.append((orig_x, orig_y, orig_w, orig_h, conf))
 
-            # Convert to OpenCV format
-            rect_cv = []
-            for r in rect_list:
-                rect_cv.append((int(r[0]), int(r[1]), int(r[2] - r[0]), int(r[3] - r[1])))
-
-            # Use OpenCV's efficient implementation
-            indices = cv2.groupRectangles(rect_cv, min_neighbors)[1]
-
-            result = []
-            if len(indices) > 0:
-                for idx in indices:
-                    if idx < len(detections):
-                        result.append(detections[idx])
-
-            return result
-
-    # Create and use the detector
-    detector = CustomDetector(model, window_size, image_shape, confidence_threshold)
-    detections = detector.detectMultiScale(
-        gray,
-        scaleFactor=scale_factor,
-        minNeighbors=min_neighbors,
-        minSize=(min(window_size) // 2, min(window_size) // 2)
-    )
+    # Apply non-maximum suppression to remove overlapping detections
+    detections = non_max_suppression(detections, overlap_threshold=0.3)
 
     return detections
 
@@ -499,7 +640,7 @@ def optimize_detector_parameters(model: Pipeline, X_validation: np.ndarray, y_va
 def detect_faces(image_path: str, model: Pipeline,
                  face_shape: Tuple[int, int]) -> Tuple[Optional[np.ndarray], List[Tuple[int, int, int, int, float]]]:
     """
-    Detect faces in an image using the SVC detector with optimized sliding window.
+    Detect faces in an image using SVC detector with Selective Search and image pyramid.
 
     Args:
         image_path (str): Path to the input image
@@ -518,21 +659,17 @@ def detect_faces(image_path: str, model: Pipeline,
 
     gray: np.ndarray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Use the optimized detection function
-    detections: List[Tuple[int, int, int, int, float]] = optimized_sliding_window_detection(
+    # Use Selective Search with image pyramid for detection
+    detections = detect_faces_with_selective_search(
         gray,
         model,
-        window_size=face_shape,
-        image_shape=face_shape,
-        step_size=8,
-        scale_factor=1.2,  # More efficient scaling
-        min_neighbors=3,  # Filtering parameter
-        confidence_threshold=0.7  # Lower threshold for more detections
+        face_shape,
+        min_confidence=0.7
     )
 
-    # Non-max suppression is handled inside the optimized detector
-    print(f"Found {len(detections)} faces using SVC detector")
+    print(f"Found {len(detections)} faces using SVC detector with Selective Search")
 
+    # Draw detections on the image
     result_img: np.ndarray = image.copy()
     for (x, y, w, h, confidence) in detections:
         cv2.rectangle(result_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -556,7 +693,7 @@ def save_detector(model: Pipeline, face_shape: Tuple[int, int]) -> None:
     filename: str = "models/svc_face_detector.joblib"
     joblib.dump(model, filename)
 
-    with open("models/svc_detector_metadata.txt", "w") as f:
+    with open("models/detector_metadata.txt", "w") as f:
         f.write(f"Face shape: {face_shape[0]}x{face_shape[1]}\n")
         f.write("Detector type: svc\n")
 
@@ -575,11 +712,18 @@ def load_detector() -> Tuple[Pipeline, Tuple[int, int]]:
             - Face shape (height, width)
     """
     filename: str = "models/svc_face_detector.joblib"
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"Model file {filename} not found. Please train the model first.")
+
     model: Pipeline = joblib.load(filename)
 
-    h: int
-    w: int
-    with open("models/svc_detector_metadata.txt", "r") as f:
+    metadata_file = "models/detector_metadata.txt"
+    if not os.path.exists(metadata_file):
+        # Default face shape if metadata is missing
+        print("Warning: Metadata file not found. Using default face shape.")
+        return model, (62, 47)  # Default LFW shape
+
+    with open(metadata_file, "r") as f:
         lines: List[str] = f.readlines()
         face_shape_str: str = lines[0].split(":")[1].strip()
         h, w = [int(x) for x in face_shape_str.split("x")]
@@ -615,34 +759,45 @@ def main(image: str) -> None:
         X_test, y_test, test_size=0.5, random_state=42)
 
     print("Training SVC face detector with optimized parameters...")
+
+    # Convert to HOG features for training
+    X_train_hog: np.ndarray = extract_hog_features(X_train, image_shape=face_shape)
+    X_test_hog: np.ndarray = extract_hog_features(X_test, image_shape=face_shape)
+    X_validation_hog: np.ndarray = extract_hog_features(X_validation, image_shape=face_shape)
+
+    # Create and train SVC model
     svc_model: Pipeline = make_pipeline(
         StandardScaler(),
         PCA(n_components=100, whiten=True, random_state=42),
         SVC(kernel='linear', probability=True, class_weight='balanced', C=10.0)
     )
-
-    X_train_hog: np.ndarray = extract_hog_features(X_train, image_shape=face_shape)
     svc_model.fit(X_train_hog, y_train)
 
-    svc_model = optimize_detector_parameters(svc_model, X_validation, y_validation)
+    # Optimize parameters for the model
+    svc_model = optimize_detector_parameters(svc_model, X_validation_hog, y_validation)
 
-    X_test_hog: np.ndarray = extract_hog_features(X_test, image_shape=face_shape)
-    y_pred: np.ndarray = svc_model.predict(X_test_hog)
+    # Evaluate SVC model
+    y_pred_svc: np.ndarray = svc_model.predict(X_test_hog)
     print("SVC Model Evaluation:")
-    print(classification_report(y_test, y_pred, target_names=["Non-Face", "Face"]))
+    print(classification_report(y_test, y_pred_svc, target_names=["Non-Face", "Face"]))
 
+    # Save the trained model
     save_detector(svc_model, face_shape)
 
-    image_path: str = "test_data" + os.sep + image
+    # Test on a new image if provided
+    if image:
+        image_path: str = "test_data" + os.sep + image
+        try:
+            result_img: Optional[np.ndarray]
+            detections: List[Tuple[int, int, int, int, float]]
+            result_img, detections = detect_faces(image_path, svc_model, face_shape)
 
-    try:
-        svc_result: Optional[np.ndarray]
-        svc_detections: List[Tuple[int, int, int, int, float]]
-        svc_result, svc_detections = detect_faces(image_path, svc_model, face_shape)
-        cv2.imwrite("results/svc_detections.jpg", svc_result)
-    except Exception as e:
-        print(f"Error testing on image: {e}")
-        print("You can still use the saved model with your own images later.")
+            if result_img is not None:
+                cv2.imwrite("results/face_detections.jpg", result_img)
+                print(f"Detection results saved to results/face_detections.jpg")
+        except Exception as e:
+            print(f"Error testing on image: {e}")
+            print("You can still use the saved model with your own images later.")
 
 
 if __name__ == "__main__":
@@ -652,4 +807,4 @@ if __name__ == "__main__":
     if not os.path.exists("results"):
         os.makedirs("results")
 
-    main("test2.jpeg")
+    main("test.jpg")

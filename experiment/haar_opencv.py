@@ -6,7 +6,7 @@ def main():
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
     # Citirea imaginii de test
-    img = cv2.imread('test_data/test.jpg')
+    img = cv2.imread('test_data/test3.jpeg')
     if img is None:
         print("Nu s-a putut încărca imaginea.")
         return
