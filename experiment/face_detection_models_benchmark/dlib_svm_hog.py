@@ -3,7 +3,7 @@ import cv2
 
 detector = dlib.get_frontal_face_detector()
 
-image_path = 'test_data/test.jpg'
+image_path = '../test_data/test.jpg'
 image = cv2.imread(image_path)
 
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
