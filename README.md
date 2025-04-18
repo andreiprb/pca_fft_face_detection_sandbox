@@ -1,3 +1,15 @@
+# SVM Face Detection Sandbox
+
+Face recognition models (starting point):
+- sklearn model: https://scikit-learn.org/stable/auto_examples/applications/plot_face_recognition.html
+- pycodemates model: https://www.pycodemates.com/2022/12/svm-for-face-recognition-using-python.html
+- mlmastery model: https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
+- madeyoga model: https://github.com/madeyoga/face-recognition
+
+Benchmarks:
+- OpenCV Cascade Classifier (Viola-Jones)
+- Dlib SVM & HOG model
+
 # TODOs:
 
 Dataset:
@@ -38,13 +50,3 @@ Detection algorithm:
 - explore using a Selective Search or EdgeBoxes approach to generate region proposals
 - explore using a Quad Tree approach based on said region proposals
 - explore using Disjoint Set Union for merging face features into a single face (SVM issue no. 2)
-
-Face recognition models:
-- sklearn model: https://scikit-learn.org/stable/auto_examples/applications/plot_face_recognition.html
-- pycodemates model: https://www.pycodemates.com/2022/12/svm-for-face-recognition-using-python.html
-- mlmastery model: https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
-- madeyoga model: https://github.com/madeyoga/face-recognition
-
-Benchmarks:
-- OpenCV Cascade Classifier (Viola-Jones)
-- Dlib SVM & HOG model
