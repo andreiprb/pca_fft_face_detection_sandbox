@@ -13,7 +13,7 @@ Benchmarks:
 # TODOs:
 
 Dataset:
-- negative images are too small (32x32, resized to 64x64), LFW images are 250x250 natively, losing lots of data from a window size of 64x64
+- negative images are too small (32x32), LFW images are 250x250 natively
 - explore FDDB dataset or find some similar dataset to CIFAR-10 for the negative class, with bigger images
 - explore CelebA dataset (https://www.kaggle.com/datasets/jessicali9530/celeba-dataset)
 - Current datasets:
