@@ -43,8 +43,6 @@ Face recognition models:
 - sklearn model: https://scikit-learn.org/stable/auto_examples/applications/plot_face_recognition.html
 - pycodemates model: https://www.pycodemates.com/2022/12/svm-for-face-recognition-using-python.html
 - mlmastery model: https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
-
-Face detection models:
 - madeyoga model: https://github.com/madeyoga/face-recognition
 
 Benchmarks:
