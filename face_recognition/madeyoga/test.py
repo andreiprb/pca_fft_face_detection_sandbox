@@ -22,7 +22,7 @@ def preprocess(img):
 with open('experiments/labels.pickle', 'rb') as f:
     labels = pickle.load(f)
 
-model = pickle.load(open('experiments/svm-96.model', 'rb'))
+model = pickle.load(open('experiments/svm-96.models', 'rb'))
 X_test = np.load('train_data/X_test.npy')
 y_test = np.load('train_data/y_test.npy')
 

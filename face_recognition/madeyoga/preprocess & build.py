@@ -77,8 +77,8 @@ np.save('train_data/y_test.npy', y_test)
 
 """-------------------------------------------------------------------------"""
 
-# Train SVM model
-print("Training SVM model...")
+# Train SVM models
+print("Training SVM models...")
 svc_model = svm.SVC(gamma='scale')
 svc_model.fit(X_train, y_train)
 
@@ -92,13 +92,13 @@ pred = svc_model.predict(X_test)
 test_acc = accuracy_score(y_test, pred)
 print("SVM Test Accuracy: ", test_acc)
 
-model_name = 'experiments/svm-{}.model'.format(str(int(test_acc*100)))
+model_name = 'experiments/svm-{}.models'.format(str(int(test_acc*100)))
 pickle.dump(svc_model, open(model_name, 'wb'))
 
 """-------------------------------------------------------------------------"""
 
-# Train KNN model
-print("Training KNN model...")
+# Train KNN models
+print("Training KNN models...")
 knn_model = KNeighborsClassifier(n_neighbors=3)
 knn_model.fit(X_train, y_train)
 
@@ -112,7 +112,7 @@ pred = knn_model.predict(X_test)
 test_acc = accuracy_score(y_test, pred)
 print("KNN Test Accuracy: ", test_acc)
 
-model_name = 'experiments/knn-{}.model'.format(str(int(test_acc*100)))
+model_name = 'experiments/knn-{}.models'.format(str(int(test_acc*100)))
 pickle.dump(knn_model, open(model_name, 'wb'))
 
 # Save labels

@@ -23,7 +23,7 @@ lfw_people = fetch_lfw_people(min_faces_per_person=70, resize=0.4)
 n_samples, h, w = lfw_people.images.shape
 
 # for machine learning we use the 2 data directly (as relative pixel
-# positions info is ignored by this model)
+# positions info is ignored by this models)
 X = lfw_people.data
 n_features = X.shape[1]
 
