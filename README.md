@@ -11,9 +11,9 @@ Feature extraction:
 
 HOG:
 - skimage HOG is painfully slow, ~4 minutes for load_dataset to execute, but provides decent results
-- opencv HOG is significantly faster, ~3 seconds for load_dataset to execute, but doesn't work well
+- opencv HOG is significantly faster, ~3 seconds for load_dataset to execute, but doesn't work well (see visualization in sandbox.ipynb)
 - explore using opencv HOG with different data preprocessing and parameter configurations to get closer to skimage current implementation (from sandbox.ipynb)
-if needed, implement our own HOG function to get more control
+- optionally, implement our own HOG function to get more control
 - explore combining HOG with edge detection, see whether PCA works better there
 
 PCA and feature selection:
