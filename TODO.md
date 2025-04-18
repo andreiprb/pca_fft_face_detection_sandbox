@@ -1,12 +1,12 @@
 # TODOs:
 
 Dataset:
-- negative images too small (32x32, resized to 64x64), LFW images 250x250 natively, losing lots of data from a window size of 64x64
-- explore FDDB dataset or find some similar dataset to CIFAR-10 for negative class, with bigger images
+- negative images are too small (32x32, resized to 64x64), LFW images are 250x250 natively, losing lots of data from a window size of 64x64
+- explore FDDB dataset or find some similar dataset to CIFAR-10 for the negative class, with bigger images
 
 Feature extraction:
 - some basic intuition suggests that the red channel is the most important for face detection
-- explore pca on green and blue channels, keeping the red channel as is, or some more complex combination of the three channels
+- explore PCA on green and blue channels, keeping the red channel as is, or some more complex combination of the three channels
 - explore Hough transform
 
 HOG:
@@ -23,6 +23,7 @@ PCA and feature selection:
 SVM:
 - explore other SVCs (poly, radial basis function) and hyperparameters
 - explore multiclass SVCs approach for face feature detection (nose, chin, eyes, etc.) side by side with the current SVC
+- explore MLMastery model (https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/)
 
 Detection algorithm:
 - sliding_window is painfully slow
