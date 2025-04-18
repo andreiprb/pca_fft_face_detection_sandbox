@@ -3,6 +3,14 @@
 Dataset:
 - negative images are too small (32x32, resized to 64x64), LFW images are 250x250 natively, losing lots of data from a window size of 64x64
 - explore FDDB dataset or find some similar dataset to CIFAR-10 for the negative class, with bigger images
+- explore CelebA dataset (https://www.kaggle.com/datasets/jessicali9530/celeba-dataset)
+- Current datasets:
+  - Labeled Faces in the Wild (LFW) - 13,000 images of faces
+    - https://complexity.cecs.ucf.edu/lfw-labeled-faces-in-the-wild/
+    - https://www.kaggle.com/datasets/jessicali9530/lfw-dataset
+  - CIFAR-10 - 60000 non-face images
+    - https://www.cs.toronto.edu/~kriz/cifar.html
+    - https://www.kaggle.com/c/cifar-10/
 
 Feature extraction:
 - some basic intuition suggests that the red channel is the most important for face detection
@@ -30,3 +38,15 @@ Detection algorithm:
 - explore using a Selective Search or EdgeBoxes approach to generate region proposals
 - explore using a Quad Tree approach based on said region proposals
 - explore using Disjoint Set Union for merging face features into a single face (SVM issue no. 2)
+
+Face recognition models:
+- sklearn model: https://scikit-learn.org/stable/auto_examples/applications/plot_face_recognition.html
+- pycodemates model: https://www.pycodemates.com/2022/12/svm-for-face-recognition-using-python.html
+- mlmastery model: https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/
+
+Face detection models:
+- madeyoga model: https://github.com/madeyoga/face-recognition
+
+Benchmarks:
+- OpenCV Cascade Classifier (Viola-Jones)
+- Dlib SVM & HOG model
