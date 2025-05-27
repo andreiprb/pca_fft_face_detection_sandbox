@@ -9,6 +9,7 @@ Face recognition models (starting point):
 Benchmarks:
 - OpenCV Cascade Classifier (Viola-Jones)
 - Dlib SVM & HOG model
+- YOLOv5
 
 # TODOs:
 
@@ -37,16 +38,8 @@ HOG:
 - explore combining HOG with edge detection, see whether PCA works better there
 
 PCA and feature selection:
-- for now, PCA generally makes predictions worse, but it is worth exploring further
-- explore using PCA to reduce the number of features, but be careful not to lose too much information
-
-SVM:
-- explore other SVCs (poly, radial basis function) and hyperparameters
-- explore multiclass SVCs approach for face feature detection (nose, chin, eyes, etc.) side by side with the current SVC
-- explore MLMastery model (https://machinelearningmastery.com/how-to-develop-a-face-recognition-system-using-facenet-in-keras-and-an-svm-classifier/)
+- use PCA for selecting eigenfaces for FFT
 
 Detection algorithm:
 - sliding_window is painfully slow
-- explore using a Selective Search or EdgeBoxes approach to generate region proposals
-- explore using a Quad Tree approach based on said region proposals
-- explore using Disjoint Set Union for merging face features into a single face (SVM issue no. 2)
+- explore using FFT for region proposal
