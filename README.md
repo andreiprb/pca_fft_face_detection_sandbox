@@ -9,7 +9,7 @@ Face recognition models (starting point):
 Benchmarks:
 - OpenCV Cascade Classifier (Viola-Jones)
 - Dlib SVM & HOG model
-- YOLOv5
+- YOLOv8
 
 # TODOs:
 
