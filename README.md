@@ -40,6 +40,9 @@ HOG:
 PCA and feature selection:
 - use PCA for selecting eigenfaces for FFT
 
+SVM:
+- explore SW + SVM in case region proposal yields low confidence
+
 Detection algorithm:
 - sliding_window is painfully slow
 - explore using FFT for region proposal
